@@ -7,29 +7,29 @@ import os
 from collections import deque
 import pandas as pd
 
-# Parámetros del entorno y el juego
-screen_size = 400
-block_size = 20
-directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+# Paràmetres de l'entorn i el joc
+tamany_pantalla = 400
+tamany_bloc = 20
+direccions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
-# Parámetros del aprendizaje por refuerzos
-gamma = 0.95  # Aumentar la influencia de recompensas futuras
+# Paràmetres de l'aprenentatge per reforç
+gamma = 0.95  # Augmentar la influència de recompenses futures
 epsilon = 1.0
 epsilon_min = 0.01
 epsilon_decay = 0.995
-learning_rate = 0.0005  # Reducir para un aprendizaje más estable
-batch_size = 64  # Aumentar el tamaño del batch para una mejor generalización
-replay_buffer_size = 5000  # Aumentar el tamaño del buffer para más diversidad
+taxa_aprenentatge = 0.0005  # Reduir per a un aprenentatge més estable
+tamany_lot = 64  # Augmentar la mida del lot per a una millor generalització
+mida_buffer_reposicio = 5000  # Augmentar la mida del buffer per a més diversitat
 
-# Dispositivo para entrenamiento
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Dispositiu per entrenar
+dispositiu = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-class DQNetwork(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(DQNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_size, 128)  # Incrementar número de neuronas
+class XarxaDQ(nn.Module):
+    def __init__(self, mida_entrada, mida_sortida):
+        super(XarxaDQ, self).__init__()
+        self.fc1 = nn.Linear(mida_entrada, 128)  # Augmentar el nombre de neurones
         self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, output_size)
+        self.fc3 = nn.Linear(128, mida_sortida)
 
     def forward(self, x):
         x = torch.relu(self.fc1(x))
@@ -37,158 +37,157 @@ class DQNetwork(nn.Module):
         x = self.fc3(x)
         return x
 
-def get_state(snake, food, direction, board_size):
-    head_x, head_y = snake[-1]
-    food_x, food_y = food
+def obtenir_estat(cua, menjar, direccio, mida_pantalla):
+    cap_x, cap_y = cua[-1]
+    menjar_x, menjar_y = menjar
 
-    state = [
-        (food_x - head_x) / board_size,
-        (food_y - head_y) / board_size,
-        direction[0],
-        direction[1],
+    estat = [
+        (menjar_x - cap_x) / mida_pantalla,
+        (menjar_y - cap_y) / mida_pantalla,
+        direccio[0],
+        direccio[1],
     ]
 
-    for dx, dy in directions:
-        next_x = head_x + dx * block_size
-        next_y = head_y + dy * block_size
-        if next_x < 0 or next_x >= screen_size or next_y < 0 or next_y >= screen_size:
-            state.append(1)
-        elif [next_x, next_y] in snake[:-1]:
-            state.append(1)
+    for dx, dy in direccions:
+        proper_x = cap_x + dx * tamany_bloc
+        proper_y = cap_y + dy * tamany_bloc
+        if proper_x < 0 or proper_x >= tamany_pantalla or proper_y < 0 or proper_y >= tamany_pantalla:
+            estat.append(1)
+        elif [proper_x, proper_y] in cua[:-1]:
+            estat.append(1)
         else:
-            state.append(0)
+            estat.append(0)
 
-    return np.array(state, dtype=np.float32)
+    return np.array(estat, dtype=np.float32)
 
-def choose_action(state, model, epsilon):
+def triar_accio(estat, model, epsilon):
     if np.random.rand() < epsilon:
         return random.randint(0, 3)
-    state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
+    estat_tensor = torch.tensor(estat, dtype=torch.float32).unsqueeze(0).to(dispositiu)
     with torch.no_grad():
-        q_values = model(state_tensor)
-    return torch.argmax(q_values).item()
+        valors_q = model(estat_tensor)
+    return torch.argmax(valors_q).item()
 
-def train_model(model, target_model, replay_buffer, optimizer, batch_size, gamma):
-    if len(replay_buffer) < batch_size:
+def entrenar_model(model, model_objetiu, buffer_reposicio, optimitzador, tamany_lot, gamma):
+    if len(buffer_reposicio) < tamany_lot:
         return
 
-    minibatch = random.sample(replay_buffer, batch_size)
-    states, actions, rewards, next_states, dones = zip(*minibatch)
+    minibatch = random.sample(buffer_reposicio, tamany_lot)
+    estats, accions, recompenses, següents_estats, fets = zip(*minibatch)
 
-    states = torch.tensor(np.array(states), dtype=torch.float32).to(device)
-    actions = torch.tensor(actions, dtype=torch.int64).unsqueeze(1).to(device)
-    rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
-    next_states = torch.tensor(np.array(next_states), dtype=torch.float32).to(device)
-    dones = torch.tensor(dones, dtype=torch.float32).to(device)
+    estats = torch.tensor(np.array(estats), dtype=torch.float32).to(dispositiu)
+    accions = torch.tensor(accions, dtype=torch.int64).unsqueeze(1).to(dispositiu)
+    recompenses = torch.tensor(recompenses, dtype=torch.float32).to(dispositiu)
+    següents_estats = torch.tensor(np.array(següents_estats), dtype=torch.float32).to(dispositiu)
+    fets = torch.tensor(fets, dtype=torch.float32).to(dispositiu)
 
-    q_values = model(states).gather(1, actions)
-    next_q_values = target_model(next_states).max(1)[0].detach()
-    target_q_values = rewards + (1 - dones) * gamma * next_q_values
+    valors_q = model(estats).gather(1, accions)
+    següents_valors_q = model_objetiu(següents_estats).max(1)[0].detach()
+    valors_q_objectiu = recompenses + (1 - fets) * gamma * següents_valors_q
 
-    loss = nn.MSELoss()(q_values.squeeze(), target_q_values)
+    pèrdua = nn.MSELoss()(valors_q.squeeze(), valors_q_objectiu)
 
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+    optimitzador.zero_grad()
+    pèrdua.backward()
+    optimitzador.step()
 
-def save_model(model, filename="snake_dqn.pth"):
-    torch.save(model.state_dict(), filename)
+def desar_model(model, nom="snake_dqn.pth"):
+    torch.save(model.state_dict(), nom)
 
-def load_model(model, filename="snake_dqn.pth"):
-    if os.path.exists(filename):
-        model.load_state_dict(torch.load(filename))
+def carregar_model(model, nom="snake_dqn.pth"):
+    if os.path.exists(nom):
+        model.load_state_dict(torch.load(nom))
 
-def save_to_excel(data, filename="training_data.xlsx"):
-    df = pd.DataFrame(data, columns=["Episodio", "Recompensa", "Longitud"])
-    if os.path.exists(filename):
-        existing_df = pd.read_excel(filename)
-        df = pd.concat([existing_df, df], ignore_index=True).drop_duplicates()
-    df.to_excel(filename, index=False)
+def desar_a_excel(dades, nom="training_data.xlsx"):
+    df = pd.DataFrame(dades, columns=["Episodi", "Recompensa", "Longitud"])
+    if os.path.exists(nom):
+        df_existent = pd.read_excel(nom)
+        df = pd.concat([df_existent, df], ignore_index=True).drop_duplicates()
+    df.to_excel(nom, index=False)
 
-def generate_food(snake, board_size, block_size):
+def generar_menjar(cua, mida_pantalla, tamany_bloc):
     while True:
-        food_x = random.randint(0, board_size - 1) * block_size
-        food_y = random.randint(0, board_size - 1) * block_size
-        food = [food_x, food_y]
-        # Verifica que la comida no esté dentro de la serpiente
-        if food not in snake:
-            # Verifica que la comida no esté demasiado cerca de la cabeza
-            head_x, head_y = snake[-1]
-            distance_to_head = abs(food_x - head_x) + abs(food_y - head_y)
-            if distance_to_head >= block_size:  # Cambia según la distancia mínima deseada
-                return food
+        menjar_x = random.randint(0, mida_pantalla - 1) * tamany_bloc
+        menjar_y = random.randint(0, mida_pantalla - 1) * tamany_bloc
+        menjar = [menjar_x, menjar_y]
+        # Verifica que el menjar no estigui dins de la cua
+        if menjar not in cua:
+            # Verifica que el menjar no estigui massa a prop del cap
+            cap_x, cap_y = cua[-1]
+            distancia_cap = abs(menjar_x - cap_x) + abs(menjar_y - cap_y)
+            if distancia_cap >= tamany_bloc:  # Canvia segons la distància mínima desitjada
+                return menjar
 
-def game_loop(model, target_model, optimizer, replay_buffer, epsilon, episode, data):
-    snake = [[screen_size // 2, screen_size // 2]]
-    direction = directions[0]
-    food = generate_food(snake, screen_size // block_size, block_size)
+def bucle_joc(model, model_objetiu, optimitzador, buffer_reposicio, epsilon, episodi, dades):
+    cua = [[tamany_pantalla // 2, tamany_pantalla // 2]]
+    direccio = direccions[0]
+    menjar = generar_menjar(cua, tamany_pantalla // tamany_bloc, tamany_bloc)
 
-    total_reward = 0
-    done = False
+    recompensa_total = 0
+    fet = False
 
-    while not done:
-        state = get_state(snake, food, direction, board_size=screen_size // block_size)
-        action = choose_action(state, model, epsilon)
+    while not fet:
+        estat = obtenir_estat(cua, menjar, direccio, mida_pantalla=tamany_pantalla // tamany_bloc)
+        accio = triar_accio(estat, model, epsilon)
 
-        direction = directions[action]
-        head_x, head_y = snake[-1]
-        new_head = [head_x + direction[0] * block_size, head_y + direction[1] * block_size]
-        snake.append(new_head)
+        direccio = direccions[accio]
+        cap_x, cap_y = cua[-1]
+        nou_cap = [cap_x + direccio[0] * tamany_bloc, cap_y + direccio[1] * tamany_bloc]
+        cua.append(nou_cap)
 
-        if (new_head in snake[:-1]) or (new_head[0] < 0 or new_head[0] >= screen_size or
-                                        new_head[1] < 0 or new_head[1] >= screen_size):
-            done = True
-            reward = -50  # Reducir penalización por colisión para evitar aprendizaje extremo
-        elif new_head == food:
-            reward = 100
-            food = [random.randint(0, (screen_size // block_size) - 1) * block_size,
-                    random.randint(0, (screen_size // block_size) - 1) * block_size]
+        if (nou_cap in cua[:-1]) or (nou_cap[0] < 0 or nou_cap[0] >= tamany_pantalla or
+                                      nou_cap[1] < 0 or nou_cap[1] >= tamany_pantalla):
+            fet = True
+            recompensa = -50  # Reduir la penalització per col·lisió per evitar un aprenentatge extrem
+        elif nou_cap == menjar:
+            recompensa = 100
+            menjar = [random.randint(0, (tamany_pantalla // tamany_bloc) - 1) * tamany_bloc,
+                      random.randint(0, (tamany_pantalla // tamany_bloc) - 1) * tamany_bloc]
         else:
-            reward = -1
-            snake.pop(0)
+            recompensa = -1
+            cua.pop(0)
 
-        total_reward += reward
-        next_state = get_state(snake, food, direction, board_size=screen_size // block_size)
+        recompensa_total += recompensa
+        següent_estat = obtenir_estat(cua, menjar, direccio, mida_pantalla=tamany_pantalla // tamany_bloc)
 
-        replay_buffer.append((state, action, reward, next_state, done))
-        train_model(model, target_model, replay_buffer, optimizer, batch_size, gamma)
+        buffer_reposicio.append((estat, accio, recompensa, següent_estat, fet))
+        entrenar_model(model, model_objetiu, buffer_reposicio, optimitzador, tamany_lot, gamma)
 
-    data.append([episode, total_reward, len(snake)])
+    dades.append([episodi, recompensa_total, len(cua)])
 
-    if episode % 10 == 0:
-        save_to_excel(data)
+    if episodi % 10 == 0:
+        desar_a_excel(dades)
 
-    return total_reward, len(snake)
+    return recompensa_total, len(cua)
 
 
-def train_ai():
-    model = DQNetwork(input_size=8, output_size=4).to(device)
-    target_model = DQNetwork(input_size=8, output_size=4).to(device)
-    target_model.load_state_dict(model.state_dict())
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+def entrenar_ai():
+    model = XarxaDQ(mida_entrada=8, mida_sortida=4).to(dispositiu)
+    model_objetiu = XarxaDQ(mida_entrada=8, mida_sortida=4).to(dispositiu)
+    model_objetiu.load_state_dict(model.state_dict())
+    optimitzador = optim.Adam(model.parameters(), lr=taxa_aprenentatge)
 
-    replay_buffer = deque(maxlen=replay_buffer_size)
+    buffer_reposicio = deque(maxlen=mida_buffer_reposicio)
     epsilon = 1.0
-    epsilon_min = 10 ** -6  # Valor final muy cercano a 0
-    epsilon_decay = 0.9995395890030878  # Ajustado para 15,000 episodios
-    episodes = 300000  # Asegúrate de que el total de episodios sea al menos este valor
-    data = []
+    epsilon_min = 10 ** -6  # Valor final molt proper a 0
+    epsilon_decay = 0.9995395890030878  # Ajustat per a 10.000 episodis
+    episodis = 300000  # Assegura't que el total d'episodis sigui com a mínim aquest valor
+    dades = []
 
-    for episode in range(episodes):
-        total_reward, length = game_loop(model, target_model, optimizer, replay_buffer, epsilon, episode, data)
+    for episodi in range(episodis):
+        recompensa_total, longitud = bucle_joc(model, model_objetiu, optimitzador, buffer_reposicio, epsilon, episodi, dades)
 
-        # Actualizar epsilon
+        # Actualitzar epsilon
         epsilon = max(epsilon_min, epsilon * epsilon_decay)
 
-        if episode % 10 == 0:
-            target_model.load_state_dict(model.state_dict())
+        if episodi % 10 == 0:
+            model_objetiu.load_state_dict(model.state_dict())
 
-        print(f"Episodio: {episode}, Recompensa: {total_reward}, Longitud: {length}")
+        print(f"Episodi: {episodi}, Recompensa: {recompensa_total}, Longitud: {longitud}")
 
-        if episode % 100 == 0:
-            save_model(model)
+        if episodi % 100 == 0:
+            desar_model(model)
 
-    save_model(model)
+    desar_model(model)
 
-
-train_ai()
+entrenar_ai()

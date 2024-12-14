@@ -4,239 +4,250 @@ import numpy as np
 import random
 import time
 from collections import deque
-import torch.nn as nn  # Aseguramos esta importación
+import torch.nn as nn
 import tkinter as tk
 from tkinter import filedialog
 
 
-# Parámetros del entorno y juego
-screen_size = 400
-block_size = 20
-directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
+# Mida de la pantalla i el bloc
+mida_pantalla = 400
+mida_bloc = 20
+# Direccions possibles de moviment
+direccions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
-# Parámetros de colores
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-YELLOW = (255, 255, 0)
-GRAY = (200, 200, 200)
+# Colors definits
+NEGRE = (0, 0, 0)
+BLANC = (255, 255, 255)
+VERD = (0, 255, 0)
+VERMELL = (255, 0, 0)
+GROC = (255, 255, 0)
+GRIS = (200, 200, 200)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# Seleccionem el dispositiu per l'entrenament
+dispositiu = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-class DQNetwork(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(DQNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_size, 128)
-        self.fc2 = nn.Linear(128, 128)
-        self.fc3 = nn.Linear(128, output_size)
+# Xarxa neuronal per al model de Deep Q-Learning
+class DQXarxa(nn.Module):
+    def __init__(self, mida_dentrada, mida_sortida):
+        super(DQXarxa, self).__init__()
+        self.fc1 = nn.Linear(mida_dentrada, 128)  # Primera capa
+        self.fc2 = nn.Linear(128, 128)  # Segona capa
+        self.fc3 = nn.Linear(128, mida_sortida)  # Capa de sortida
 
     def forward(self, x):
-        x = torch.relu(self.fc1(x))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.relu(self.fc1(x))  # Funció d'activació ReLU per a la primera capa
+        x = torch.relu(self.fc2(x))  # Funció d'activació ReLU per a la segona capa
+        x = self.fc3(x)  # Capa de sortida
         return x
 
-def select_model_file():
+
+# Funció per seleccionar un arxiu de model
+def seleccionar_arxiu_model():
     root = tk.Tk()
-    root.withdraw()  # Oculta la ventana principal
-    model_path = filedialog.askopenfilename(
-        title="Select Model File",
-        filetypes=[("Model Files", "*.pth"), ("All Files", "*.*")]
+    root.withdraw()  # Amaga la finestra principal
+    cami_model = filedialog.askopenfilename(
+        title="Selecciona l'arxiu del model",
+        filetypes=[("Arxius de Model", "*.pth"), ("Tots els Arxius", "*.*")]
     )
-    if not model_path:
-        print("No file selected. Exiting...")
-        exit()  # Salir si no selecciona un archivo
-    return model_path
+    if not cami_model:
+        print("No s'ha seleccionat cap arxiu. Sortint...")
+        exit()  # Sortir si no es selecciona cap arxiu
+    return cami_model
 
-# Cargar el modelo seleccionado
-def load_selected_model(model, filename):
-    model.load_state_dict(torch.load(filename))
-    print(f"Model loaded from: {filename}")
 
-# Función para jugar con el modelo
-def play_game_with_ai(model):
-    # Tu función play_game_with_ai aquí
+# Funció per carregar el model seleccionat des d'un arxiu
+def carregar_model_seleccionat(model, nom_arxiu):
+    model.load_state_dict(torch.load(nom_arxiu))  # Carrega els pesos del model
+    print(f"Model carregat des de: {nom_arxiu}")
+
+
+# Funció per jugar al joc amb l'AI (qualsevol lògica d'AI pot ser afegida aquí)
+def jugar_joc_amb_ai(model):
     pass
 
-# Función principal
-def main():
-    pygame.init()
 
-    # Seleccionar archivo del modelo mediante ventana emergente
-    model_path = select_model_file()
+# Funció principal que inicialitza el joc i el model
+def principal():
+    pygame.init()  # Inicialitza pygame
 
-    # Crear y cargar modelo
-    model = DQNetwork(input_size=8, output_size=4).to(device)
-    load_selected_model(model, model_path)
+    # Seleccionem el fitxer del model mitjançant una finestra emergent
+    cami_model = seleccionar_arxiu_model()
 
-    # Configurar el modelo para evaluación
-    model.eval()
+    # Creem el model i carreguem-lo
+    model = DQXarxa(mida_dentrada=8, mida_sortida=4).to(dispositiu)
+    carregar_model_seleccionat(model, cami_model)
 
-    # Jugar con el modelo cargado
-    play_game_with_ai(model)
-def get_state(snake, food, direction, board_size):
-    head_x, head_y = snake[-1]
-    food_x, food_y = food
+    model.eval()  # Posem el model en mode d'avaluació
 
-    state = [
-        (food_x - head_x) / board_size,
-        (food_y - head_y) / board_size,
-        direction[0],
-        direction[1],
+    # Comencem a jugar amb el model carregat
+    jugar_joc_amb_ai(model)
+
+
+# Funció per obtenir l'estat actual del joc
+def obtenir_estat(serp, menjar, direccio, mida_pantalla):
+    cap_x, cap_y = serp[-1]  # Posició de la capçalera de la serp
+    menjar_x, menjar_y = menjar  # Posició del menjar
+
+    # Creem un vector d'estat amb la distància del menjar i la direcció actual
+    estat = [
+        (menjar_x - cap_x) / mida_pantalla,
+        (menjar_y - cap_y) / mida_pantalla,
+        direccio[0],
+        direccio[1],
     ]
 
-    for dx, dy in directions:
-        next_x = head_x + dx * block_size
-        next_y = head_y + dy * block_size
-        if next_x < 0 or next_x >= screen_size or next_y < 0 or next_y >= screen_size:
-            state.append(1)
-        elif [next_x, next_y] in snake[:-1]:
-            state.append(1)
+    # Afegim l'estat de les possibles direccions al voltant de la serp
+    for dx, dy in direccions:
+        prox_x = cap_x + dx * mida_bloc
+        prox_y = cap_y + dy * mida_bloc
+        if prox_x < 0 or prox_x >= mida_pantalla or prox_y < 0 or prox_y >= mida_pantalla:
+            estat.append(1)  # L'estat és perillós (fora de la pantalla)
+        elif [prox_x, prox_y] in serp[:-1]:
+            estat.append(1)  # L'estat és perillós (ocupat per la serp)
         else:
-            state.append(0)
+            estat.append(0)  # L'estat és segur
 
-    return np.array(state, dtype=np.float32)
+    return np.array(estat, dtype=np.float32)
 
 
-def choose_action(state, model):
-    state_tensor = torch.tensor(state, dtype=torch.float32).unsqueeze(0).to(device)
+# Funció per triar l'acció en base a l'estat utilitzant el model
+def triar_accio(estat, model):
+    estat_tensor = torch.tensor(estat, dtype=torch.float32).unsqueeze(0).to(dispositiu)
     with torch.no_grad():
-        q_values = model(state_tensor)
-    return torch.argmax(q_values).item()
+        valors_q = model(estat_tensor)  # Obtenim els valors Q per a l'estat actual
+    return torch.argmax(valors_q).item()  # Retornem l'acció amb el valor més alt
 
 
-def game_over_screen(screen, font, score, time_elapsed):
-    # Fondo de pantalla de "Game Over"
-    screen.fill((50, 50, 50))  # Gris oscuro
+# Funció per mostrar la pantalla de "Game Over"
+def pantalla_game_over(pantalla, font, puntuacio, temps_transcorregut):
+    pantalla.fill((50, 50, 50))  # Fons de pantalla gris fosc
 
-    # Mensajes de texto
-    game_over_text = font.render("GAME OVER", True, RED)
-    score_text = font.render(f"Score: {score}", True, WHITE)
-    time_text = font.render(f"Time: {int(time_elapsed)} seconds", True, WHITE)
-    retry_text = font.render("Press R to Retry or Q to Quit", True, WHITE)
+    # Mostrem els missatges de "Game Over" i les estadístiques
+    text_game_over = font.render("GAME OVER", True, VERMELL)
+    text_puntuacio = font.render(f"Puntuació: {puntuacio}", True, BLANC)
+    text_temps = font.render(f"Temps: {int(temps_transcorregut)} segons", True, BLANC)
+    text_reintentar = font.render("Prem R per tornar a provar o Q per sortir", True, BLANC)
 
-    # Posiciones centradas
-    screen_width, screen_height = screen.get_size()
-    center_x = screen_width // 2
-    center_y = screen_height // 2
+    amplada_pantalla, altura_pantalla = pantalla.get_size()
+    centre_x = amplada_pantalla // 2
+    centre_y = altura_pantalla // 2
 
-    # Dibujar los textos centrados
-    screen.blit(game_over_text, (center_x - game_over_text.get_width() // 2, center_y - 100))
-    screen.blit(score_text, (center_x - score_text.get_width() // 2, center_y - 50))
-    screen.blit(time_text, (center_x - time_text.get_width() // 2, center_y))
-    screen.blit(retry_text, (center_x - retry_text.get_width() // 2, center_y + 50))
+    # Centrem els textos a la pantalla
+    pantalla.blit(text_game_over, (centre_x - text_game_over.get_width() // 2, centre_y - 100))
+    pantalla.blit(text_puntuacio, (centre_x - text_puntuacio.get_width() // 2, centre_y - 50))
+    pantalla.blit(text_temps, (centre_x - text_temps.get_width() // 2, centre_y))
+    pantalla.blit(text_reintentar, (centre_x - text_reintentar.get_width() // 2, centre_y + 50))
 
-    # Actualizar pantalla
-    pygame.display.flip()
+    pygame.display.flip()  # Actualitzem la pantalla
 
-    # Espera 2 segundos antes de continuar
-    pygame.time.wait(2000)
+    pygame.time.wait(2000)  # Esperem 2 segons abans de continuar
 
 
-
-def play_game_with_ai(model):
-    pygame.init()
-    screen = pygame.display.set_mode((screen_size, screen_size + 50))
-    pygame.display.set_caption("Snake AI")
-    clock = pygame.time.Clock()  # Controlador de tiempo
-    font = pygame.font.SysFont(None, 36)
+# Funció per jugar el joc amb l'AI
+def jugar_joc_amb_ai(model):
+    pygame.init()  # Inicialitzem pygame
+    pantalla = pygame.display.set_mode((mida_pantalla, mida_pantalla + 50))  # Creem la finestra
+    pygame.display.set_caption("Snake AI")  # Títol de la finestra
+    rellotge = pygame.time.Clock()  # Controlador de temps
+    font = pygame.font.SysFont(None, 36)  # Font per al text
 
     while True:
-        snake = [[screen_size // 2, screen_size // 2]]
-        direction = directions[0]
-        food = [random.randint(0, (screen_size // block_size) - 1) * block_size,
-                random.randint(0, (screen_size // block_size) - 1) * block_size]
-        score = 0
-        start_time = time.time()
-        running = True
+        serp = [[mida_pantalla // 2, mida_pantalla // 2]]  # Inicialitzem la serp
+        direccio = direccions[0]  # Direcció inicial
+        menjar = [random.randint(0, (mida_pantalla // mida_bloc) - 1) * mida_bloc,
+                  random.randint(0, (mida_pantalla // mida_bloc) - 1) * mida_bloc]  # Posició inicial del menjar
+        puntuacio = 0
+        temps_inici = time.time()  # Temps de començament del joc
+        executant = True
 
-        while running:
-            screen.fill(BLACK)
-            for x in range(0, screen_size, block_size):
-                for y in range(0, screen_size, block_size):
-                    pygame.draw.rect(screen, GRAY if (x + y) // block_size % 2 == 0 else WHITE,
-                                     (x, y, block_size, block_size))
+        while executant:
+            pantalla.fill(NEGRE)  # Fons de la pantalla
 
-            # Barra inferior
-            pygame.draw.rect(screen, WHITE, (0, screen_size, screen_size, 50))
-            score_text = font.render(f"Score: {score}", True, BLACK)
-            time_text = font.render(f"Time: {int(time.time() - start_time)}s", True, BLACK)
-            screen.blit(score_text, (10, screen_size + 10))
-            screen.blit(time_text, (200, screen_size + 10))
+            # Dibuixem la graella de la pantalla
+            for x in range(0, mida_pantalla, mida_bloc):
+                for y in range(0, mida_pantalla, mida_bloc):
+                    pygame.draw.rect(pantalla, GRIS if (x + y) // mida_bloc % 2 == 0 else BLANC,
+                                     (x, y, mida_bloc, mida_bloc))
 
-            # Dibujar comida
-            pygame.draw.rect(screen, RED, (food[0], food[1], block_size, block_size))
+            pygame.draw.rect(pantalla, BLANC, (0, mida_pantalla, mida_pantalla, 50))  # Barra inferior
+            text_puntuacio = font.render(f"Puntuació: {puntuacio}", True, NEGRE)
+            text_temps = font.render(f"Temps: {int(time.time() - temps_inici)}s", True, NEGRE)
+            pantalla.blit(text_puntuacio, (10, mida_pantalla + 10))  # Dibuixem la puntuació
+            pantalla.blit(text_temps, (200, mida_pantalla + 10))  # Dibuixem el temps
 
-            # Dibujar serpiente
-            for i, segment in enumerate(snake):
-                color = YELLOW if i == len(snake) - 1 else GREEN
-                pygame.draw.rect(screen, color, (segment[0], segment[1], block_size, block_size))
+            # Dibuixem el menjar
+            pygame.draw.rect(pantalla, VERMELL, (menjar[0], menjar[1], mida_bloc, mida_bloc))
 
-                # Dibujar dirección en la cabeza
-                if i == len(snake) - 1:
-                    head_x, head_y = segment
-                    dx, dy = direction
-                    pygame.draw.line(screen, BLACK,
-                                     (head_x + block_size // 2, head_y + block_size // 2),
-                                     (head_x + block_size // 2 + dx * block_size // 2,
-                                      head_y + block_size // 2 + dy * block_size // 2), 3)
+            # Dibuixem la serp
+            for i, segment in enumerate(serp):
+                color = GROC if i == len(serp) - 1 else VERD
+                pygame.draw.rect(pantalla, color, (segment[0], segment[1], mida_bloc, mida_bloc))
 
-            pygame.display.flip()
+                # Dibuixem la direcció a la capçalera de la serp
+                if i == len(serp) - 1:
+                    cap_x, cap_y = segment
+                    dx, dy = direccio
+                    pygame.draw.line(pantalla, NEGRE,
+                                     (cap_x + mida_bloc // 2, cap_y + mida_bloc // 2),
+                                     (cap_x + mida_bloc // 2 + dx * mida_bloc // 2,
+                                      cap_y + mida_bloc // 2 + dy * mida_bloc // 2), 3)
 
-            # Estado actual
-            state = get_state(snake, food, direction, board_size=screen_size // block_size)
-            action = choose_action(state, model)
+            pygame.display.flip()  # Actualitzem la pantalla
 
-            # Movimiento
-            direction = directions[action]
-            head_x, head_y = snake[-1]
-            new_head = [head_x + direction[0] * block_size, head_y + direction[1] * block_size]
-            snake.append(new_head)
+            # Obtenim l'estat actual i triem l'acció
+            estat = obtenir_estat(serp, menjar, direccio, mida_pantalla=mida_pantalla // mida_bloc)
+            accio = triar_accio(estat, model)
 
-            if (new_head in snake[:-1]) or (new_head[0] < 0 or new_head[0] >= screen_size or
-                                            new_head[1] < 0 or new_head[1] >= screen_size):
-                game_over_screen(screen, font, score, time.time() - start_time)
-                running = False
+            # Movem la serp
+            direccio = direccions[accio]
+            cap_x, cap_y = serp[-1]
+            nou_cap = [cap_x + direccio[0] * mida_bloc, cap_y + direccio[1] * mida_bloc]
+            serp.append(nou_cap)
 
-            elif new_head == food:
-                score += 1
-                food = [random.randint(0, (screen_size // block_size) - 1) * block_size,
-                        random.randint(0, (screen_size // block_size) - 1) * block_size]
+            # Comprovem si el joc ha acabat
+            if (nou_cap in serp[:-1]) or (nou_cap[0] < 0 or nou_cap[0] >= mida_pantalla or
+                                          nou_cap[1] < 0 or nou_cap[1] >= mida_pantalla):
+                pantalla_game_over(pantalla, font, puntuacio, time.time() - temps_inici)
+                executant = False
+
+            elif nou_cap == menjar:  # Si la serp menja el menjar
+                puntuacio += 1
+                menjar = [random.randint(0, (mida_pantalla // mida_bloc) - 1) * mida_bloc,
+                          random.randint(0, (mida_pantalla // mida_bloc) - 1) * mida_bloc]
             else:
-                snake.pop(0)
+                serp.pop(0)  # Movem la serp
 
-            # Eventos de Pygame
+            # Processar esdeveniments de pygame
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     return
 
-            clock.tick(10)  # Ajusta los FPS a 20
+            rellotge.tick(10)  # Establim els FPS
 
-        # Pantalla de "Game Over"
-        waiting = True
-        while waiting:
+        # Pantalla d'espera després del "Game Over"
+        esperant = True
+        while esperant:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     return
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_r:
-                        waiting = False
+                        esperant = False  # Reiniciar el joc
                     elif event.key == pygame.K_q:
                         pygame.quit()
                         return
 
 
-
-def main():
-    model = DQNetwork(input_size=8, output_size=4).to(device)
-    model.load_state_dict(torch.load("snake_dqn.pth", map_location=device))
-    model.eval()
-    play_game_with_ai(model)
+# Funció per executar el joc
+def principal():
+    model = DQXarxa(mida_dentrada=8, mida_sortida=4).to(dispositiu)  # Creem el model
+    model.load_state_dict(torch.load("snake_dqn.pth", map_location=dispositiu))  # Carreguem el model entrenat
+    model.eval()  # Posem el model en mode d'avaluació
+    jugar_joc_amb_ai(model)  # Iniciem el joc
 
 
 if __name__ == "__main__":
-    main()
+    principal()  # Iniciem el programa
